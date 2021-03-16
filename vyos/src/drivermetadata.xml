@@ -70,5 +70,7 @@
                            Description="Optional. Virtual routing and Forwarding management name"/>
             </Parameters>
         </Command>
+        <Command Name="show_interfaces" DisplayName="Show Interfaces" Tags="" Description="Show interfaces">
+        </Command>
     </Layout>
 </Driver>

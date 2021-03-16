@@ -36,6 +36,53 @@ node_types:
           inventory_description:
             type: string
             default: Describe the resource shell template
+          User:
+            description: User with administrative privileges
+            type: string
+          Password:
+            description: The password is required by some CLI protocols such as Telnet and is required according to the device configuration.
+            type: cloudshell.datatypes.Password
+          SNMP Read Community:
+            description: The SNMP Read-Only Community String is like a password. It is sent along with each SNMP Get-Request and allows (or denies) access to device.
+            type: string
+          SNMP Write Community:
+            description: The SNMP Write Community String is like a password. It is sent along with each SNMP Set-Request and allows (or denies) chaning MIBs values.
+            type: string
+          SNMP V3 User:
+            description: Relevant only in case SNMP V3 is in use.
+            type: string
+          SNMP V3 Password:
+            description: Relevant only in case SNMP V3 is in use.
+            type: cloudshell.datatypes.Password
+          SNMP V3 Private Key:
+            description: Relevant only in case SNMP V3 is in use.
+            type: string
+          SNMP V3 Authentication Protocol:
+            description: Relevant only in case SNMP V3 is in use.
+            type: string
+            default: No Authentication Protocol
+            constraints:
+              - valid_values: [No Authentication Protocol, MD5, SHA]
+          SNMP V3 Privacy Protocol:
+            description: Relevant only in case SNMP V3 is in use.
+            type: string
+            default: No Privacy Protocol
+            constraints:
+              - valid_values: [No Privacy Protocol, DES, 3DES-EDE, AES-128, AES-192, AES-256]
+          SNMP Version:
+            type: string
+            default: ''
+            description: The version of SNMP to use. Possible values are v1, v2c and v3.
+            constraints:
+              - valid_values: [ v1, v2c, v3]
+          Enable SNMP:
+            description: If set to True and SNMP isn’t enabled yet in the device the Shell will automatically enable SNMP in the device when Autoload command is called. SNMP must be enabled on the device for the Autoload command to run successfully. True by default.
+            type: boolean
+            default: true
+          Disable SNMP:
+            description: If set to True SNMP will be disabled automatically by the Shell after the Autoload command execution is completed. False by default.
+            type: boolean
+            default: false
     artifacts:
       icon:
         file: shell-icon.png

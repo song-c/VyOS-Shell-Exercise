@@ -13,11 +13,18 @@ from cloudshell.shell.core.resource_driver_interface import ResourceDriverInterf
 from cloudshell.shell.flows.connectivity.models.connectivity_result import ConnectivitySuccessResponse
 from cloudshell.shell.flows.connectivity.simple_flow import apply_connectivity_changes
 from cloudshell.shell.standards.networking.driver_interface import NetworkingResourceDriverInterface
+from cloudshell.shell.core.session.logging_session import LoggingSessionContext
+from cloudshell.shell.core.session.cloudshell_session import CloudShellSessionContext
+#from cloudshell.snmp.quali_snmp import QualiSnmp, QualiMibTable
+from cloudshell.cli.session.ssh_session import SSHSession
+from cloudshell.cli.service.cli import CLI
+from cloudshell.cli.service.command_mode import CommandMode
 
 #from data_model import *  # run 'shellfoundry generate' to generate data model classes
 
 
 class VyosDriver(ResourceDriverInterface, NetworkingResourceDriverInterface, GlobalLock):
+
     """
     ResourceDriverInterface - describe all functionality/methods which should be implemented
                               for base abstract resource
@@ -262,6 +269,52 @@ class VyosDriver(ResourceDriverInterface, NetworkingResourceDriverInterface, Glo
         pass
 
     # </editor-fold>
+
+    # def retrieving_snmp_properties(self, context, ip, community_string):
+    #     """
+    #     :param ResourceCommandContext context: The context object for the command with resource and reservation info
+    #     """
+    #     logger = LoggingSessionContext.get_logger_with_thread_id(context)
+    #
+    #     snmp_version = context.resource.attributes['SNMP Version']
+    #     community_string = context.resource.attributes['SNMP Read Community']
+    #     snmp_service = QualiSnmp(ip=ip, snmp_version='2',
+    #                              snmp_community=community_string,
+    #                              logger=logger)
+    #
+    #     return snmp_service.get_property('SNMPv2-MIB', 'sysName', 0)
+    #
+    # def retrieving_snmp_table(self, context, ip):
+    #     """
+    #     :param ResourceCommandContext context: The context object for the command with resource and reservation info
+    #     """
+    #     logger = LoggingSessionContext.get_logger_with_thread_id(context)
+    #
+    #     snmp_service = QualiSnmp(ip=ip, snmp_version='2',
+    #                              snmp_community="Community String",
+    #                              logger=logger)
+    #
+    #     if_table = snmp_service.get_table('IF-MIB', 'ifDescr')
+
+    def show_interfaces(self, context):
+        """
+        :param ResourceCommandContext context: The context object for the command with resource and reservation info
+        :return: response
+        :rtype: str
+        """
+        logger = LoggingSessionContext.get_logger_with_thread_id(context)
+        api = CloudShellSessionContext(context).get_api()
+        host = context.resource.address
+        username = context.resource.attributes['Vyos.User']
+        password = api.DecryptPassword(context.resource.attributes['Vyos.Password']).Value
+        logger.info('{} : {} , {}'.format(host, username, password))
+        session = SSHSession(host=host, username=username, password=password)
+        mode = CommandMode(r'.*$')
+        cli = CLI()
+        with cli.get_session([session], mode) as cli_service:
+            out = cli_service.send_command('show interfaces')
+            return out
+
 
     def cleanup(self):
         """
