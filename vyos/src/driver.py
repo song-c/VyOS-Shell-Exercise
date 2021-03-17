@@ -1,14 +1,9 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import datetime
-import json
-
-from cloudshell.shell.core.driver_context import InitCommandContext, ResourceCommandContext, AutoLoadResource, \
-    AutoLoadAttribute, AutoLoadDetails, CancellationContext
+from cloudshell.shell.core.driver_context import InitCommandContext, ResourceCommandContext, AutoLoadDetails
 from cloudshell.shell.core.driver_utils import GlobalLock
-from cloudshell.shell.core.interfaces.save_restore import OrchestrationSaveResult, OrchestrationSavedArtifact, \
-    OrchestrationSavedArtifactInfo, OrchestrationRestoreRules
+from cloudshell.shell.core.interfaces.save_restore import OrchestrationSaveResult
 from cloudshell.shell.core.resource_driver_interface import ResourceDriverInterface
 from cloudshell.shell.flows.connectivity.models.connectivity_result import ConnectivitySuccessResponse
 from cloudshell.shell.flows.connectivity.simple_flow import apply_connectivity_changes
@@ -20,7 +15,7 @@ from cloudshell.cli.session.ssh_session import SSHSession
 from cloudshell.cli.service.cli import CLI
 from cloudshell.cli.service.command_mode import CommandMode
 
-#from data_model import *  # run 'shellfoundry generate' to generate data model classes
+# from data_model import *  # run 'shellfoundry generate' to generate data model classes
 
 
 class VyosDriver(ResourceDriverInterface, NetworkingResourceDriverInterface, GlobalLock):
@@ -322,3 +317,46 @@ class VyosDriver(ResourceDriverInterface, NetworkingResourceDriverInterface, Glo
         This is a good place to close any open sessions, finish writing to log files
         """
         pass
+
+if __name__ == "__main__":
+    import mock
+    from cloudshell.shell.core.driver_context import CancellationContext
+    from cloudshell.api.cloudshell_api import CloudShellAPISession
+    server = "desktop-4thdm3n"
+    username = "admin"
+    password = "admin"
+    resource_name = "VyOS4"
+    model = "Vyos"
+    api = CloudShellAPISession(server, username, password, "Global")
+    # enc_password = api.GetAttributeValue(resource_name, "{}.Password".format(model)).Value
+
+    api_token = api.token_id
+    # shell_name = "Vyos"
+
+    cancellation_context = mock.create_autospec(CancellationContext)
+    context = mock.create_autospec(ResourceCommandContext)
+    context.resource = mock.MagicMock()
+    context.reservation = mock.MagicMock()
+    context.connectivity = mock.MagicMock()
+    context.connectivity.serverAddress = server
+    context.connectivity.server_address = server
+    context.connectivity.cloudshell_api_port = "8029"
+    context.connectivity.cloudshell_api_scheme = "http"
+    context.connectivity.admin_auth_token = api_token
+    # context.reservation.reservation_id = "<RESERVATION_ID>"
+    # context.reservation.domain="Global"
+    context.resource.address = "192.168.51.126"
+    context.resource.name = resource_name
+
+    context.resource.attributes = dict()
+    context.resource.attributes["{}.User".format("Vyos")] = "vyos"
+    
+    context.resource.attributes["{}.Password".format("Vyos")] = enc_password
+    # context.resource.attributes["{}.CLI TCP Port".format(shell_name)] = "22"
+
+    driver = VyosDriver()
+    # print driver.run_custom_command(context, custom_command="sh run", cancellation_context=cancellation_context)
+    driver.initialize(context)
+    driver.get_inventory(context)
+
+    print("done")
