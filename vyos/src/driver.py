@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-
+import logging
 from cloudshell.shell.core.driver_context import InitCommandContext, ResourceCommandContext, AutoLoadDetails
 from cloudshell.shell.core.driver_utils import GlobalLock
 from cloudshell.shell.core.interfaces.save_restore import OrchestrationSaveResult
@@ -11,11 +11,14 @@ from cloudshell.shell.standards.networking.driver_interface import NetworkingRes
 from cloudshell.shell.core.session.logging_session import LoggingSessionContext
 from cloudshell.shell.core.session.cloudshell_session import CloudShellSessionContext
 #from cloudshell.snmp.quali_snmp import QualiSnmp, QualiMibTable
-from cloudshell.cli.session.ssh_session import SSHSession
-from cloudshell.cli.service.cli import CLI
-from cloudshell.cli.service.command_mode import CommandMode
+#from cloudshell.cli.session.ssh_session import SSHSession
+#$from cloudshell.cli.service.cli import CLI
+#from cloudshell.cli.service.command_mode import CommandMode
 
 # from data_model import *  # run 'shellfoundry generate' to generate data model classes
+from cloudshell.snmp.cloudshell_snmp import Snmp
+from cloudshell.snmp.core.domain.snmp_oid import SnmpMibObject
+from cloudshell.snmp.snmp_parameters import SNMPWriteParameters
 
 
 class VyosDriver(ResourceDriverInterface, NetworkingResourceDriverInterface, GlobalLock):
@@ -135,6 +138,7 @@ class VyosDriver(ResourceDriverInterface, NetworkingResourceDriverInterface, Glo
         # to use this sample, you'll need to add jsonpickle to your requirements.txt file
         # The JSON schema is defined at: https://github.com/QualiSystems/sandbox_orchestration_standard/blob/master/save%20%26%20restore/saved_artifact_info.schema.json
         # You can find more information and examples examples in the spec document at https://github.com/QualiSystems/sandbox_orchestration_standard/blob/master/save%20%26%20restore/save%20%26%20restore%20standard.md
+
         '''
         # By convention, all dates should be UTC
         created_date = datetime.datetime.utcnow()
@@ -228,6 +232,24 @@ class VyosDriver(ResourceDriverInterface, NetworkingResourceDriverInterface, Glo
         # In real life, this code will be preceded by SNMP/other calls to the resource details and will not be static
         # run 'shellfoundry generate' in order to create classes that represent your data model
 
+        logger = logging
+
+        snmp_community_enc = context.resource.attributes['Vyos.SNMP Read Community'].Value
+        snmp_community_dec = api.DecryptPassword(snmp_community_enc).Value
+        try:
+            snmp_params = SNMPWriteParameters(context.resource.address, snmp_community_dec, "v2")
+            logger.info("started")
+
+            snmp_handler = Snmp()
+
+            with snmp_handler.get_snmp_service(snmp_parameters=snmp_params, logger=logger) as snmp_service:
+                  # Retruns empty SnmpResponse in case get command failed to retrieve data
+                response = snmp_service.get_table(SnmpMibObject('IF-MIB', 'ifXTable'))
+                print("")
+
+        except Exception as e:
+            logger.error(str(e))
+
         '''
         resource = Vyos.create_from_context(context)
         resource.vendor = 'specify the shell vendor'
@@ -303,12 +325,12 @@ class VyosDriver(ResourceDriverInterface, NetworkingResourceDriverInterface, Glo
         username = context.resource.attributes['Vyos.User']
         password = api.DecryptPassword(context.resource.attributes['Vyos.Password']).Value
         logger.info('{} : {} , {}'.format(host, username, password))
-        session = SSHSession(host=host, username=username, password=password)
-        mode = CommandMode(r'.*$')
-        cli = CLI()
-        with cli.get_session([session], mode) as cli_service:
-            out = cli_service.send_command('show interfaces')
-            return out
+        #session = SSHSession(host=host, username=username, password=password)
+        #mode = CommandMode(r'.*$')
+        #cli = CLI()
+        #with cli.get_session([session], mode) as cli_service:
+        #    out = cli_service.send_command('show interfaces')
+        #    return out
 
 
     def cleanup(self):
@@ -325,12 +347,12 @@ if __name__ == "__main__":
     server = "desktop-4thdm3n"
     username = "admin"
     password = "admin"
-    resource_name = "VyOS4"
+    resource_name = "VyosExerciseDevice4"
     model = "Vyos"
     api = CloudShellAPISession(server, username, password, "Global")
-    # enc_password = api.GetAttributeValue(resource_name, "{}.Password".format(model)).Value
+    enc_password = api.GetAttributeValue(resource_name, "{}.Password".format(model)).Value
 
-    api_token = api.token_id
+    # api_token = api.token_id
     # shell_name = "Vyos"
 
     cancellation_context = mock.create_autospec(CancellationContext)
@@ -342,16 +364,17 @@ if __name__ == "__main__":
     context.connectivity.server_address = server
     context.connectivity.cloudshell_api_port = "8029"
     context.connectivity.cloudshell_api_scheme = "http"
-    context.connectivity.admin_auth_token = api_token
+    # context.connectivity.admin_auth_token = api_token
     # context.reservation.reservation_id = "<RESERVATION_ID>"
     # context.reservation.domain="Global"
     context.resource.address = "192.168.51.126"
     context.resource.name = resource_name
 
     context.resource.attributes = dict()
-    context.resource.attributes["{}.User".format("Vyos")] = "vyos"
-    
+    snmp_community = api.GetAttributeValue(resource_name, "{}.SNMP Read Community".format(model))
+    context.resource.attributes["{}.SNMP Read Community".format("Vyos")] = snmp_community
     context.resource.attributes["{}.Password".format("Vyos")] = enc_password
+    context.resource.attributes["{}.User".format("Vyos")] = "vyos"
     # context.resource.attributes["{}.CLI TCP Port".format(shell_name)] = "22"
 
     driver = VyosDriver()
