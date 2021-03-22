@@ -244,7 +244,6 @@ class VyosDriver(ResourceDriverInterface, NetworkingResourceDriverInterface, Glo
             snmp_community_enc = context.resource.attributes['Vyos.SNMP Read Community']
             logger.info(snmp_community_enc)
             snmp_community_dec = api.DecryptPassword(snmp_community_enc).Value
-            # snmp_community_dec = 'public'
             logger.info(snmp_community_dec)
             try:
                 snmp_params = SNMPWriteParameters(context.resource.address, snmp_community_dec, "v2")
@@ -258,7 +257,6 @@ class VyosDriver(ResourceDriverInterface, NetworkingResourceDriverInterface, Glo
                     # resource.model = 'Vyos'
 
                     chassis1 = GenericChassis('Chassis 1')
-                    # chassis1.model = 'Vyos.GenericChassis'
                     chassis1.serial_number = ''
                     resource.add_sub_resource('1', chassis1)
                     logger.info(chassis1.name)
@@ -268,44 +266,19 @@ class VyosDriver(ResourceDriverInterface, NetworkingResourceDriverInterface, Glo
                     for interface in response.values():
                         if 'ifName' in interface:
                             port_idx += 1
-                            port_name = interface['ifName'].value
+                            port_name = interface['ifName'].safe_value
                             port = GenericPort(port_name)
                             # port.mac_address = ''
                             # port.ipv4_address = ''
                             chassis1.add_sub_resource(str(port_idx), port)
                             logger.info(port_name)
-                logger.info('resource: {}'.format(str(resource)))
-
             except Exception as e:
                 logger.error(str(e))
                 raise
 
-            '''
-            resource = Vyos.create_from_context(context)
-            resource.vendor = 'specify the shell vendor'
-            resource.model = 'specify the shell model'
-    
-            chassis1 = GenericChassis('Chassis 1')
-            chassis1.model = 'WS-X4232-GB-RJ'
-            chassis1.serial_number = 'JAE053002JD'
-            resource.add_sub_resource('1', chassis1)
-    
-            module1 = GenericModule('Module 1')
-            module1.model = 'WS-X5561-GB-AB'
-            module1.serial_number = 'TGA053972JD'
-            chassis1.add_sub_resource('1', module1)
-    
-            port1 = GenericPort('Port 1')
-            port1.mac_address = 'fe80::e10c:f055:f7f1:bb7t16'
-            port1.ipv4_address = '192.168.10.7'
-            module1.add_sub_resource('1', port1)
-    
-            return resource.create_autoload_details()
-            '''
             result = resource.create_autoload_details()
             logger.info('return object: {} {}'.format(str(result), 'is None' if result is None else 'is not None'))
             return result
-            # return AutoLoadDetails([], [])
 
     # </editor-fold>
 
