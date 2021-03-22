@@ -10,12 +10,13 @@ from cloudshell.shell.flows.connectivity.simple_flow import apply_connectivity_c
 from cloudshell.shell.standards.networking.driver_interface import NetworkingResourceDriverInterface
 from cloudshell.shell.core.session.logging_session import LoggingSessionContext
 from cloudshell.shell.core.session.cloudshell_session import CloudShellSessionContext
+from cloudshell.shell.core.driver_context import AutoLoadCommandContext
 #from cloudshell.snmp.quali_snmp import QualiSnmp, QualiMibTable
-#from cloudshell.cli.session.ssh_session import SSHSession
-#$from cloudshell.cli.service.cli import CLI
-#from cloudshell.cli.service.command_mode import CommandMode
+from cloudshell.cli.session.ssh_session import SSHSession
+from cloudshell.cli.service.cli import CLI
+from cloudshell.cli.service.command_mode import CommandMode
 
-# from data_model import *  # run 'shellfoundry generate' to generate data model classes
+from data_model import *  # run 'shellfoundry generate' to generate data model classes
 from cloudshell.snmp.cloudshell_snmp import Snmp
 from cloudshell.snmp.core.domain.snmp_oid import SnmpMibObject
 from cloudshell.snmp.snmp_parameters import SNMPWriteParameters
@@ -232,47 +233,79 @@ class VyosDriver(ResourceDriverInterface, NetworkingResourceDriverInterface, Glo
         # In real life, this code will be preceded by SNMP/other calls to the resource details and will not be static
         # run 'shellfoundry generate' in order to create classes that represent your data model
 
-        logger = logging
-
-        snmp_community_enc = context.resource.attributes['Vyos.SNMP Read Community'].Value
-        snmp_community_dec = api.DecryptPassword(snmp_community_enc).Value
-        try:
-            snmp_params = SNMPWriteParameters(context.resource.address, snmp_community_dec, "v2")
+        # logger = LoggingSessionContext.get_logger_for_context(context)
+        with LoggingSessionContext(context) as logger:
             logger.info("started")
+            api = CloudShellSessionContext(context).get_api()
+            # api = CloudShellAPISession(host=context.connectivity.server_address,
+            #                            token_id=context.connectivity.admin_auth_token,
+            #                            domain="Global")
 
-            snmp_handler = Snmp()
+            snmp_community_enc = context.resource.attributes['Vyos.SNMP Read Community']
+            logger.info(snmp_community_enc)
+            snmp_community_dec = api.DecryptPassword(snmp_community_enc).Value
+            # snmp_community_dec = 'public'
+            logger.info(snmp_community_dec)
+            try:
+                snmp_params = SNMPWriteParameters(context.resource.address, snmp_community_dec, "v2")
+                snmp_handler = Snmp()
 
-            with snmp_handler.get_snmp_service(snmp_parameters=snmp_params, logger=logger) as snmp_service:
-                  # Retruns empty SnmpResponse in case get command failed to retrieve data
-                response = snmp_service.get_table(SnmpMibObject('IF-MIB', 'ifXTable'))
-                print("")
+                with snmp_handler.get_snmp_service(snmp_parameters=snmp_params, logger=logger) as snmp_service:
+                    # response = snmp_service.get_table(SnmpMibObject('IF-MIB', 'ifTable'))
+                    # Retruns empty SnmpResponse in case get command failed to retrieve data
+                    resource = Vyos.create_from_context(context)
+                    # resource.vendor = 'Vyos'
+                    # resource.model = 'Vyos'
 
-        except Exception as e:
-            logger.error(str(e))
+                    chassis1 = GenericChassis('Chassis 1')
+                    # chassis1.model = 'Vyos.GenericChassis'
+                    chassis1.serial_number = ''
+                    resource.add_sub_resource('1', chassis1)
+                    logger.info(chassis1.name)
 
-        '''
-        resource = Vyos.create_from_context(context)
-        resource.vendor = 'specify the shell vendor'
-        resource.model = 'specify the shell model'
+                    response = snmp_service.get_table(SnmpMibObject('IF-MIB', 'ifXTable'))
+                    port_idx = 0
+                    for interface in response.values():
+                        if 'ifName' in interface:
+                            port_idx += 1
+                            port_name = interface['ifName'].value
+                            port = GenericPort(port_name)
+                            # port.mac_address = ''
+                            # port.ipv4_address = ''
+                            chassis1.add_sub_resource(str(port_idx), port)
+                            logger.info(port_name)
+                logger.info('resource: {}'.format(str(resource)))
 
-        chassis1 = GenericChassis('Chassis 1')
-        chassis1.model = 'WS-X4232-GB-RJ'
-        chassis1.serial_number = 'JAE053002JD'
-        resource.add_sub_resource('1', chassis1)
+            except Exception as e:
+                logger.error(str(e))
+                raise
 
-        module1 = GenericModule('Module 1')
-        module1.model = 'WS-X5561-GB-AB'
-        module1.serial_number = 'TGA053972JD'
-        chassis1.add_sub_resource('1', module1)
-
-        port1 = GenericPort('Port 1')
-        port1.mac_address = 'fe80::e10c:f055:f7f1:bb7t16'
-        port1.ipv4_address = '192.168.10.7'
-        module1.add_sub_resource('1', port1)
-
-        return resource.create_autoload_details()
-        '''
-        return AutoLoadDetails([], [])
+            '''
+            resource = Vyos.create_from_context(context)
+            resource.vendor = 'specify the shell vendor'
+            resource.model = 'specify the shell model'
+    
+            chassis1 = GenericChassis('Chassis 1')
+            chassis1.model = 'WS-X4232-GB-RJ'
+            chassis1.serial_number = 'JAE053002JD'
+            resource.add_sub_resource('1', chassis1)
+    
+            module1 = GenericModule('Module 1')
+            module1.model = 'WS-X5561-GB-AB'
+            module1.serial_number = 'TGA053972JD'
+            chassis1.add_sub_resource('1', module1)
+    
+            port1 = GenericPort('Port 1')
+            port1.mac_address = 'fe80::e10c:f055:f7f1:bb7t16'
+            port1.ipv4_address = '192.168.10.7'
+            module1.add_sub_resource('1', port1)
+    
+            return resource.create_autoload_details()
+            '''
+            result = resource.create_autoload_details()
+            logger.info('return object: {} {}'.format(str(result), 'is None' if result is None else 'is not None'))
+            return result
+            # return AutoLoadDetails([], [])
 
     # </editor-fold>
 
@@ -284,34 +317,6 @@ class VyosDriver(ResourceDriverInterface, NetworkingResourceDriverInterface, Glo
         :return: str: Success or fail message
         """
         pass
-
-    # </editor-fold>
-
-    # def retrieving_snmp_properties(self, context, ip, community_string):
-    #     """
-    #     :param ResourceCommandContext context: The context object for the command with resource and reservation info
-    #     """
-    #     logger = LoggingSessionContext.get_logger_with_thread_id(context)
-    #
-    #     snmp_version = context.resource.attributes['SNMP Version']
-    #     community_string = context.resource.attributes['SNMP Read Community']
-    #     snmp_service = QualiSnmp(ip=ip, snmp_version='2',
-    #                              snmp_community=community_string,
-    #                              logger=logger)
-    #
-    #     return snmp_service.get_property('SNMPv2-MIB', 'sysName', 0)
-    #
-    # def retrieving_snmp_table(self, context, ip):
-    #     """
-    #     :param ResourceCommandContext context: The context object for the command with resource and reservation info
-    #     """
-    #     logger = LoggingSessionContext.get_logger_with_thread_id(context)
-    #
-    #     snmp_service = QualiSnmp(ip=ip, snmp_version='2',
-    #                              snmp_community="Community String",
-    #                              logger=logger)
-    #
-    #     if_table = snmp_service.get_table('IF-MIB', 'ifDescr')
 
     def show_interfaces(self, context):
         """
@@ -325,12 +330,12 @@ class VyosDriver(ResourceDriverInterface, NetworkingResourceDriverInterface, Glo
         username = context.resource.attributes['Vyos.User']
         password = api.DecryptPassword(context.resource.attributes['Vyos.Password']).Value
         logger.info('{} : {} , {}'.format(host, username, password))
-        #session = SSHSession(host=host, username=username, password=password)
-        #mode = CommandMode(r'.*$')
-        #cli = CLI()
-        #with cli.get_session([session], mode) as cli_service:
-        #    out = cli_service.send_command('show interfaces')
-        #    return out
+        session = SSHSession(host=host, username=username, password=password)
+        mode = CommandMode(r'.*$')
+        cli = CLI()
+        with cli.get_session([session], mode) as cli_service:
+           out = cli_service.send_command('show interfaces')
+           return out
 
 
     def cleanup(self):
@@ -341,22 +346,22 @@ class VyosDriver(ResourceDriverInterface, NetworkingResourceDriverInterface, Glo
         pass
 
 if __name__ == "__main__":
-    import mock
+    from unittest import mock
     from cloudshell.shell.core.driver_context import CancellationContext
     from cloudshell.api.cloudshell_api import CloudShellAPISession
-    server = "desktop-4thdm3n"
+    server = "localhost"
     username = "admin"
     password = "admin"
-    resource_name = "VyosExerciseDevice4"
+    resource_name = "vyos-dev4"
+    address = "192.168.51.126"
     model = "Vyos"
     api = CloudShellAPISession(server, username, password, "Global")
     enc_password = api.GetAttributeValue(resource_name, "{}.Password".format(model)).Value
-
     # api_token = api.token_id
     # shell_name = "Vyos"
 
     cancellation_context = mock.create_autospec(CancellationContext)
-    context = mock.create_autospec(ResourceCommandContext)
+    context = mock.create_autospec(AutoLoadCommandContext)
     context.resource = mock.MagicMock()
     context.reservation = mock.MagicMock()
     context.connectivity = mock.MagicMock()
@@ -367,18 +372,16 @@ if __name__ == "__main__":
     # context.connectivity.admin_auth_token = api_token
     # context.reservation.reservation_id = "<RESERVATION_ID>"
     # context.reservation.domain="Global"
-    context.resource.address = "192.168.51.126"
+    context.resource.address = address
     context.resource.name = resource_name
 
     context.resource.attributes = dict()
-    snmp_community = api.GetAttributeValue(resource_name, "{}.SNMP Read Community".format(model))
+    snmp_community = api.GetAttributeValue(resource_name, "{}.SNMP Read Community".format(model)).Value
     context.resource.attributes["{}.SNMP Read Community".format("Vyos")] = snmp_community
     context.resource.attributes["{}.Password".format("Vyos")] = enc_password
     context.resource.attributes["{}.User".format("Vyos")] = "vyos"
-    # context.resource.attributes["{}.CLI TCP Port".format(shell_name)] = "22"
 
     driver = VyosDriver()
-    # print driver.run_custom_command(context, custom_command="sh run", cancellation_context=cancellation_context)
     driver.initialize(context)
     driver.get_inventory(context)
 
